@@ -126,7 +126,7 @@ function renderUserServers() {
         const botInfo = hasBot ? botGuilds.find(bg => bg.id === g.id) : null;
 
         return `
-        <div class="server-card ${hasBot ? '' : 'no-bot'}" onclick="${hasBot ? `openServer('${g.id}')` : `addBot('${g.id}')`}">
+        <div class="server-card ${hasBot ? '' : 'no-bot'}">
             <div class="server-icon">
                 ${g.icon ? `<img src="${g.icon}" alt="${g.name}">` : g.name.charAt(0)}
             </div>
@@ -134,11 +134,14 @@ function renderUserServers() {
                 <h3>${g.name}</h3>
                 ${hasBot
                 ? `<span>${botInfo?.memberCount || ''} عضو</span>
-                       <div class="bot-status active">✓ البوت مضاف</div>`
+                       <div class="bot-status active">✓ البوت مضاف</div>
+                       <button class="manage-btn" onclick="openServer('${g.id}')">
+                           ⚙️ إدارة البوت
+                       </button>`
                 : `<div class="bot-status inactive">البوت غير مضاف</div>
-                       <a href="#" class="add-bot-btn" onclick="event.stopPropagation(); addBot('${g.id}')">
+                       <button class="add-bot-btn" onclick="addBot('${g.id}')">
                            ➕ إضافة البوت
-                       </a>`
+                       </button>`
             }
             </div>
         </div>

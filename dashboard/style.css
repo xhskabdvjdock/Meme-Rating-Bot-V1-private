@@ -910,6 +910,29 @@ body::before {
   box-shadow: 0 6px 18px rgba(34, 197, 94, 0.4);
 }
 
+/* Manage Button */
+.manage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+  box-shadow: 0 4px 12px rgba(0, 180, 216, 0.3);
+}
+
+.manage-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 180, 216, 0.4);
+}
+
 /* Server card with add bot state */
 .server-card.no-bot {
   opacity: 0.85;
