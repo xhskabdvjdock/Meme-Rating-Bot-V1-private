@@ -1,25 +1,22 @@
-// State
-let currentGuildId = null;
-let currentSystem = 'memerate';
-let guilds = [];
-let channels = [];
-let config = {};
+const express = require('express');
+const path = require('path');
+const app = express();
 
-// API Base
-const API = '';
+// 1. تحديد المنفذ (مهم جداً لـ Render)
+const port = process.env.PORT || 3000;
 
-// DOM Elements
-const serversPage = document.getElementById('servers-page');
-const memeratePage = document.getElementById('memerate-page');
-const gifPage = document.getElementById('gif-page');
-const pageTitle = document.getElementById('page-title');
-const serversList = document.getElementById('servers-list');
-const subNav = document.getElementById('sub-nav');
+// 2. أخبر السيرفر أين توجد ملفات الـ Dashboard (مثل app.js و index.html)
+// افترضنا هنا أن ملفاتك داخل مجلد اسمه public
+app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    loadServers();
-    initTheme();
+// 3. مسار تشغيل الواجهة
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// 4. تشغيل السيرفر
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Dashboard is live on: http://localhost:${port}`);
 });
 
 // =============== Theme Toggle ===============
@@ -448,3 +445,4 @@ function showToast(message, type = '') {
         toast.className = 'toast';
     }, 3000);
 }
+
