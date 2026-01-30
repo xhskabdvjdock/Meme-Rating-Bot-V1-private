@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 
@@ -11,9 +12,26 @@ const PORT = process.env.PORT || 3000;
 const dashboardPath = path.resolve(__dirname, "..", "dashboard");
 console.log("[Dashboard] Static files path:", dashboardPath);
 
+// التحقق من وجود الملفات
+const indexPath = path.join(dashboardPath, "index.html");
+if (fs.existsSync(indexPath)) {
+    console.log("[Dashboard] ✅ index.html found");
+} else {
+    console.log("[Dashboard] ❌ index.html NOT found at:", indexPath);
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(dashboardPath));
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+    res.json({
+        status: "ok",
+        dashboardPath,
+        indexExists: fs.existsSync(indexPath)
+    });
+});
 
 // الحصول على إعدادات سيرفر
 app.get("/api/guilds/:guildId/config", (req, res) => {
@@ -48,6 +66,16 @@ app.delete("/api/guilds/:guildId/stats", (req, res) => {
     res.json({ success: true });
 });
 
+// Catch-all route - يرسل index.html لجميع الطلبات غير الـ API
+app.get("*", (req, res) => {
+    res.sendFile(path.join(dashboardPath, "index.html"));
+});
+
+// تشغيل السيرفر فوراً
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Dashboard] Running at http://localhost:${PORT}`);
+});
+
 function startDashboard(client) {
     // إضافة endpoint للحصول على معلومات السيرفرات
     app.get("/api/guilds", (req, res) => {
@@ -71,15 +99,7 @@ function startDashboard(client) {
         res.json(channels);
     });
 
-    // Catch-all route - يرسل index.html لجميع الطلبات غير الـ API
-    app.get("*", (req, res) => {
-        res.sendFile(path.join(dashboardPath, "index.html"));
-    });
-
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`[Dashboard] Running at http://localhost:${PORT}`);
-    });
+    console.log("[Dashboard] Discord client endpoints registered");
 }
 
 module.exports = { startDashboard };
-
