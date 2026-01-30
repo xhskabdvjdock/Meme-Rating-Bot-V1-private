@@ -1,4 +1,5 @@
 require("dotenv").config({ path: ".env" });
+// src/bot.js
 const {
   Client,
   GatewayIntentBits,
@@ -14,11 +15,11 @@ const { incrementDeleteCount, getLeaderboard, resetUserStats, resetGuildStats } 
 const { startDashboard } = require("./dashboard");
 const gifConverter = require("./gifConverter");
 
-// قراءة التوكن مباشرة من Render Environment
-const token = process.env.DISCORD_TOKEN; 
+// جلب التوكن من إعدادات Render مباشرة
+const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
-  console.error("❌ خطأ: DISCORD_TOKEN غير موجود في إعدادات Render (Environment).");
+  console.error("❌ خطأ: لم يتم العثور على DISCORD_TOKEN. تأكد من إضافته في Environment Variables على Render.");
   process.exit(1);
 }
 
@@ -32,20 +33,37 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-// لتفادي جدولة نفس الرسالة أكثر من مرة أثناء التشغيل
-const scheduled = new Map(); // messageId -> timeoutId
-const continuousIntervals = new Map(); // guildId -> intervalId
+const scheduled = new Map();
+const continuousIntervals = new Map();
 
-// بدء التنظيف الدوري لمجلد temp
-gifConverter.startPeriodicCleanup(60); // كل ساعة
+gifConverter.startPeriodicCleanup(60);
 
-function parseEmojiKey(input) {
-  // Unicode: "✅"
-  // Custom: "<:name:id>" or "<a:name:id>"
-  const m = input.match(/^<a?:([A-Za-z0-9_]+):(\d+)>$/);
-  if (m) return `${m[1]}:${m[2]}`;
-  return input;
-}
+// استخدام clientReady بدلاً من ready لتجنب التحذير
+client.once("clientReady", async () => {
+  console.log(`✅ تم تشغيل البوت بنجاح باسم: ${client.user.tag}`);
+
+  // بدء تشغيل لوحة التحكم
+  startDashboard(client);
+
+  const pending = readPending();
+  const now = Date.now();
+  for (const [messageId, record] of Object.entries(pending)) {
+    if (!record?.endsAtMs || !record?.guildId || !record?.channelId) {
+      removePending(messageId);
+      continue;
+    }
+    if (record.endsAtMs <= now) {
+      finalizeVote({ ...record, messageId }).catch(() => null);
+      continue;
+    }
+    scheduleFinalize(record.guildId, record.channelId, messageId, record.endsAtMs, record.createdAtMs || now);
+  }
+});
+
+// --- أبقِ جميع الوظائف الأخرى (on messageCreate, finalizeVote, إلخ) كما هي في ملفك الأصلي ---
+// (تم اختصارها هنا للمساحة، لكن لا تحذف أي كود منطقي للبوت من ملفك)
+
+client.login(token);
 
 function isMemeMessage(message) {
   if (!message.attachments || message.attachments.size === 0) return false;
@@ -615,5 +633,6 @@ function stopContinuousCheck(guildId) {
     console.log(`[Continuous] Stopped checking guild ${guildId}`);
   }
 }
+
 
 
