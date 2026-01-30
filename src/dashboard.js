@@ -28,10 +28,10 @@ app.set('trust proxy', 1);
 // Session middleware
 app.use(session({
     secret: process.env.SESSION_SECRET || "meme-rate-secret-key-change-in-production",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: false, // مؤقتاً معطل للتجربة
         httpOnly: true,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 أيام
