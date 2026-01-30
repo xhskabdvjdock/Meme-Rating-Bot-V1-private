@@ -1,4 +1,3 @@
-// src/dashboard.js
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -6,23 +5,47 @@ const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 
 const app = express();
-
-// استخدام PORT ليتوافق مع نظام Render التلقائي
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-// تحديد مجلد ملفات الواجهة (app.js و index.html)
 app.use(express.static(path.join(__dirname, "..", "dashboard")));
 
-// مسارات الـ API
-app.get("/api/guilds/:guildId/config", (req, res) => res.json(getGuildConfig(req.params.guildId)));
-app.patch("/api/guilds/:guildId/config", (req, res) => res.json(setGuildConfig(req.params.guildId, req.body)));
-app.get("/api/guilds/:guildId/leaderboard", (req, res) => res.json(getLeaderboard(req.params.guildId, parseInt(req.query.limit) || 10)));
+// الحصول على إعدادات سيرفر
+app.get("/api/guilds/:guildId/config", (req, res) => {
+    const config = getGuildConfig(req.params.guildId);
+    res.json(config);
+});
+
+// تحديث إعدادات سيرفر
+app.patch("/api/guilds/:guildId/config", (req, res) => {
+    const guildId = req.params.guildId;
+    const updates = req.body;
+    const newConfig = setGuildConfig(guildId, updates);
+    res.json(newConfig);
+});
+
+// الحصول على قائمة أسوأ الناشرين
+app.get("/api/guilds/:guildId/leaderboard", (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const leaderboard = getLeaderboard(req.params.guildId, limit);
+    res.json(leaderboard);
+});
+
+// إعادة تعيين إحصائيات مستخدم
+app.delete("/api/guilds/:guildId/stats/:userId", (req, res) => {
+    resetUserStats(req.params.guildId, req.params.userId);
+    res.json({ success: true });
+});
+
+// إعادة تعيين إحصائيات السيرفر
+app.delete("/api/guilds/:guildId/stats", (req, res) => {
+    resetGuildStats(req.params.guildId);
+    res.json({ success: true });
+});
 
 function startDashboard(client) {
-    // جلب قائمة السيرفرات
+    // إضافة endpoint للحصول على معلومات السيرفرات
     app.get("/api/guilds", (req, res) => {
         const guilds = client.guilds.cache.map(g => ({
             id: g.id,
@@ -33,21 +56,26 @@ function startDashboard(client) {
         res.json(guilds);
     });
 
+    // الحصول على قنوات سيرفر
     app.get("/api/guilds/:guildId/channels", async (req, res) => {
         const guild = client.guilds.cache.get(req.params.guildId);
         if (!guild) return res.status(404).json({ error: "Guild not found" });
-        res.json(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).map(c => ({ id: c.id, name: c.name })));
+
+        const channels = guild.channels.cache
+            .filter(c => c.type === 0 || c.type === 5) // Text & Announcement
+            .map(c => ({ id: c.id, name: c.name, type: c.type }));
+        res.json(channels);
     });
 
-    // حل مشكلة Not Found: توجيه أي طلب غير معروف إلى صفحة الداشبورد
-    app.get("*", (req, res) => {
+    // الصفحة الرئيسية - catch all (يجب أن تكون في النهاية)
+    app.get("/", (req, res) => {
         res.sendFile(path.join(__dirname, "..", "dashboard", "index.html"));
     });
 
-    // الاستماع على المنفذ الصحيح وواجهة الشبكة المطلوبة لـ Render
-    app.listen(PORT, "0.0.0.0", () => {
-        console.log(`🚀 [Dashboard] لوحة التحكم تعمل على المنفذ: ${PORT}`);
+    app.listen(PORT, () => {
+        console.log(`[Dashboard] Running at http://localhost:${PORT}`);
     });
 }
 
 module.exports = { startDashboard };
+
