@@ -7,6 +7,11 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || "http://localhost:3000/auth/callback";
 
+// Debug: log environment variables at startup
+console.log("[Auth] CLIENT_ID:", CLIENT_ID ? `${CLIENT_ID.substring(0, 5)}...` : "NOT SET");
+console.log("[Auth] CLIENT_SECRET:", CLIENT_SECRET ? `${CLIENT_SECRET.substring(0, 5)}...` : "NOT SET");
+console.log("[Auth] REDIRECT_URI:", REDIRECT_URI);
+
 // Bot invite URL
 const BOT_INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=93248&integration_type=0&scope=bot+applications.commands`;
 
