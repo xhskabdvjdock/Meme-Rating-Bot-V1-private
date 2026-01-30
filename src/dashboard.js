@@ -7,9 +7,13 @@ const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStor
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// مسار مجلد الداشبورد
+const dashboardPath = path.resolve(__dirname, "..", "dashboard");
+console.log("[Dashboard] Static files path:", dashboardPath);
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "..", "dashboard")));
+app.use(express.static(dashboardPath));
 
 // الحصول على إعدادات سيرفر
 app.get("/api/guilds/:guildId/config", (req, res) => {
@@ -69,7 +73,7 @@ function startDashboard(client) {
 
     // Catch-all route - يرسل index.html لجميع الطلبات غير الـ API
     app.get("*", (req, res) => {
-        res.sendFile(path.join(__dirname, "..", "dashboard", "index.html"));
+        res.sendFile(path.join(dashboardPath, "index.html"));
     });
 
     app.listen(PORT, '0.0.0.0', () => {
