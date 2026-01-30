@@ -14,9 +14,11 @@ const { incrementDeleteCount, getLeaderboard, resetUserStats, resetGuildStats } 
 const { startDashboard } = require("./dashboard");
 const gifConverter = require("./gifConverter");
 
-const token = process.env.DISCORD_TOKEN;
+// قراءة التوكن مباشرة من Render Environment
+const token = process.env.DISCORD_TOKEN; 
+
 if (!token) {
-  console.error("Missing DISCORD_TOKEN. Put it in ./env (see env.example).");
+  console.error("❌ خطأ: DISCORD_TOKEN غير موجود في إعدادات Render (Environment).");
   process.exit(1);
 }
 
@@ -613,4 +615,5 @@ function stopContinuousCheck(guildId) {
     console.log(`[Continuous] Stopped checking guild ${guildId}`);
   }
 }
+
 
