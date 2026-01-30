@@ -5,6 +5,7 @@ const fs = require("fs");
 const session = require("express-session");
 const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
+const { getStreakLeaderboard, getStreak, getAllGuildStreaks } = require("./streakStore");
 const authRoutes = require("./auth");
 
 const app = express();
@@ -122,6 +123,27 @@ app.delete("/api/guilds/:guildId/stats/:userId", (req, res) => {
 app.delete("/api/guilds/:guildId/stats", (req, res) => {
     resetGuildStats(req.params.guildId);
     res.json({ success: true });
+});
+
+// =============== Streak API ===============
+
+// الحصول على ليدربورد الستريك
+app.get("/api/guilds/:guildId/streaks", (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const leaderboard = getStreakLeaderboard(req.params.guildId, limit);
+    res.json(leaderboard);
+});
+
+// الحصول على ستريك مستخدم معين
+app.get("/api/guilds/:guildId/streaks/:userId", (req, res) => {
+    const streak = getStreak(req.params.guildId, req.params.userId);
+    res.json(streak);
+});
+
+// الحصول على جميع الستريكات
+app.get("/api/guilds/:guildId/all-streaks", (req, res) => {
+    const streaks = getAllGuildStreaks(req.params.guildId);
+    res.json(streaks);
 });
 
 // Route للصفحة الرئيسية - تعرض صفحة الهبوط

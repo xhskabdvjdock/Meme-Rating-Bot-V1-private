@@ -27,6 +27,8 @@ const DEFAULT_GUILD_CONFIG = {
   gifQuality: "medium", // low | medium | high
   gifDuration: 5, // مدة الفيديو بالثواني
   gifAutoEnabled: true, // التحويل التلقائي
+  // إعدادات الستريك
+  streakChannelIds: [], // قنوات الستريك اليومي
 };
 
 function ensureDataFile() {

@@ -35,6 +35,10 @@
           <img src="icons/gif.png" class="nav-icon" alt="">
           GIF Converter
         </a>
+        <a href="#" class="nav-item" data-system="streak" onclick="showSystem('streak')">
+          🔥
+          Daily Streak
+        </a>
       </nav>
 
       <!-- User Profile Section -->
@@ -216,6 +220,57 @@
                 <br>
                 <p><strong>ملاحظة:</strong></p>
                 <p>لتحويل الفيديوهات، يجب تثبيت ffmpeg على السيرفر</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Streak System -->
+        <section id="streak-page" class="page">
+          <button class="back-btn" onclick="showServers()">← رجوع للسيرفرات</button>
+
+          <div class="system-header">
+            <div class="system-icon-text">🔥</div>
+            <div>
+              <h2>نظام الستريك اليومي</h2>
+              <p>تتبع نشاط المستخدمين بإرسال الميديا يومياً</p>
+            </div>
+          </div>
+
+          <div class="settings-container">
+            <!-- Streak Channels Card -->
+            <div class="card">
+              <h3>قنوات الستريك</h3>
+              <p class="card-desc">أي رسالة ميديا (صورة/فيديو/ملصق/GIF) في هذه القنوات ستُحدّث الستريك</p>
+              <div id="streak-channels-list" class="channels-list"></div>
+
+              <div class="form-group">
+                <label>إضافة قناة</label>
+                <select id="add-streak-channel-select">
+                  <option value="">اختر قناة...</option>
+                </select>
+                <button class="btn small" onclick="addStreakChannel()">إضافة</button>
+              </div>
+            </div>
+
+            <!-- Streak Leaderboard Card -->
+            <div class="card">
+              <h3>🏆 ليدربورد الستريك</h3>
+              <div id="streak-leaderboard" class="leaderboard"></div>
+              <button class="btn small" onclick="loadStreakLeaderboard()">🔄 تحديث</button>
+            </div>
+
+            <!-- Streak Info Card -->
+            <div class="card info-card">
+              <h3>كيف يعمل النظام</h3>
+              <div class="info-content">
+                <p>✅ أرسل <strong>صورة/فيديو/ملصق/GIF</strong> يومياً</p>
+                <p>❌ الرسائل النصية <strong>لا تُحسب</strong></p>
+                <p>⏰ إذا فات يوم = الستريك يعود لـ <strong>0</strong></p>
+                <br>
+                <p>🏆 <strong>إنجازات:</strong></p>
+                <p>🔥 7 أيام = أسبوع كامل!</p>
+                <p>🔥 30 يوم = شهر كامل!</p>
               </div>
             </div>
           </div>

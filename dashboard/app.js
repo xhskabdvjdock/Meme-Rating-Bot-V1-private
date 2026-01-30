@@ -15,6 +15,7 @@ const API = '';
 const serversPage = document.getElementById('servers-page');
 const memeratePage = document.getElementById('memerate-page');
 const gifPage = document.getElementById('gif-page');
+const streakPage = document.getElementById('streak-page');
 const pageTitle = document.getElementById('page-title');
 const serversList = document.getElementById('servers-list');
 const subNav = document.getElementById('sub-nav');
@@ -237,6 +238,7 @@ function showServers() {
     serversPage.classList.add('active');
     memeratePage.classList.remove('active');
     gifPage.classList.remove('active');
+    streakPage.classList.remove('active');
 
     // Reset nav items
     document.querySelectorAll('.sub-nav .nav-item').forEach(el => el.classList.remove('active'));
@@ -249,6 +251,7 @@ function showSystem(system) {
     serversPage.classList.remove('active');
     memeratePage.classList.remove('active');
     gifPage.classList.remove('active');
+    streakPage.classList.remove('active');
 
     // Show selected system
     if (system === 'memerate') {
@@ -256,6 +259,10 @@ function showSystem(system) {
         loadLeaderboard();
     } else if (system === 'gif') {
         gifPage.classList.add('active');
+    } else if (system === 'streak') {
+        streakPage.classList.add('active');
+        loadStreakChannels();
+        loadStreakLeaderboard();
     }
 
     // Update nav
@@ -582,4 +589,109 @@ function showToast(message, type = '') {
     setTimeout(() => {
         toast.className = 'toast';
     }, 3000);
+}
+
+// =============== Streak System ===============
+
+async function loadStreakChannels() {
+    if (!config.streakChannelIds) {
+        config.streakChannelIds = [];
+    }
+
+    // Populate channel select
+    const select = document.getElementById('add-streak-channel-select');
+    select.innerHTML = '<option value="">اختر قناة...</option>';
+
+    channels.forEach(ch => {
+        if (!config.streakChannelIds.includes(ch.id)) {
+            select.innerHTML += `<option value="${ch.id}">#${ch.name}</option>`;
+        }
+    });
+
+    renderStreakChannels();
+}
+
+function renderStreakChannels() {
+    const container = document.getElementById('streak-channels-list');
+    if (!config.streakChannelIds || config.streakChannelIds.length === 0) {
+        container.innerHTML = '<p class="empty-state">لا توجد قنوات ستريك. أضف قناة لتفعيل النظام.</p>';
+        return;
+    }
+
+    container.innerHTML = config.streakChannelIds.map(id => {
+        const ch = channels.find(c => c.id === id);
+        return `
+            <div class="channel-item">
+                <span>#${ch?.name || id}</span>
+                <button class="btn danger small" onclick="removeStreakChannel('${id}')">إزالة</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function addStreakChannel() {
+    const select = document.getElementById('add-streak-channel-select');
+    const channelId = select.value;
+    if (!channelId) return;
+
+    const ids = [...(config.streakChannelIds || []), channelId];
+
+    try {
+        const res = await fetch(`${API}/api/guilds/${currentGuildId}/config`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ streakChannelIds: ids })
+        });
+        config = await res.json();
+        loadStreakChannels();
+        showToast('تمت إضافة قناة الستريك ✅', 'success');
+    } catch (err) {
+        showToast('خطأ في إضافة القناة', 'error');
+    }
+}
+
+async function removeStreakChannel(channelId) {
+    const ids = (config.streakChannelIds || []).filter(id => id !== channelId);
+
+    try {
+        const res = await fetch(`${API}/api/guilds/${currentGuildId}/config`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ streakChannelIds: ids })
+        });
+        config = await res.json();
+        loadStreakChannels();
+        showToast('تمت إزالة القناة ❌', 'success');
+    } catch (err) {
+        showToast('خطأ في إزالة القناة', 'error');
+    }
+}
+
+async function loadStreakLeaderboard() {
+    const container = document.getElementById('streak-leaderboard');
+    container.innerHTML = '<div class="loading">جاري التحميل...</div>';
+
+    try {
+        const res = await fetch(`${API}/api/guilds/${currentGuildId}/streaks?limit=10`);
+        const streaks = await res.json();
+
+        if (!streaks || streaks.length === 0) {
+            container.innerHTML = '<p class="empty-state">لا توجد بيانات ستريك بعد.</p>';
+            return;
+        }
+
+        container.innerHTML = streaks.map((s, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+            const badge = s.streak >= 30 ? '🏆' : s.streak >= 7 ? '⭐' : '';
+            return `
+                <div class="leaderboard-item">
+                    <span class="rank">${medal}</span>
+                    <span class="user-id">${s.userId}</span>
+                    <span class="streak-count">🔥 ${s.streak} ${badge}</span>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = '<p class="empty-state">خطأ في تحميل البيانات</p>';
+    }
 }

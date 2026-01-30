@@ -13,6 +13,7 @@ const { readPending, upsertPending, removePending } = require("./pendingStore");
 const { incrementDeleteCount, getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 const { startDashboard } = require("./dashboard");
 const gifConverter = require("./gifConverter");
+const streakStore = require("./streakStore");
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -614,3 +615,117 @@ function stopContinuousCheck(guildId) {
   }
 }
 
+// =============== نظام الستريك اليومي ===============
+
+// التحقق إذا الرسالة تحتوي على ميديا (صورة/فيديو/ملصق/GIF)
+function isMediaMessage(message) {
+  // التحقق من المرفقات
+  if (message.attachments && message.attachments.size > 0) {
+    for (const [, att] of message.attachments) {
+      const ct = (att.contentType || "").toLowerCase();
+      if (ct.startsWith("image/") || ct.startsWith("video/")) return true;
+      const name = (att.name || "").toLowerCase();
+      if (/\.(png|jpe?g|gif|webp|mp4|mov|webm)$/i.test(name)) return true;
+    }
+  }
+
+  // التحقق من الملصقات (Stickers)
+  if (message.stickers && message.stickers.size > 0) return true;
+
+  // التحقق من الروابط للصور/الفيديوهات
+  if (message.embeds && message.embeds.length > 0) {
+    for (const embed of message.embeds) {
+      if (embed.image || embed.video || embed.thumbnail) return true;
+    }
+  }
+
+  return false;
+}
+
+// إرسال embed الستريك
+async function sendStreakEmbed(channel, user, result) {
+  try {
+    let embed;
+
+    if (result.reason === "already_updated") {
+      // الستريك محدث بالفعل
+      embed = new EmbedBuilder()
+        .setColor(0xFFA500) // برتقالي
+        .setTitle("• الستريك مُحدّث بالفعل")
+        .setDescription(`تم بالفعل تحديث الستريك خلال هذا اليوم`)
+        .addFields(
+          { name: "المستخدم", value: `<@${user.id}>`, inline: true },
+          { name: "🔥 الستريك الحالي", value: `**${result.streak}** (اليوم)`, inline: true }
+        )
+        .setThumbnail(user.displayAvatarURL())
+        .setFooter({ text: "v1.1.1" });
+    } else if (result.reason === "streak_reset") {
+      // الستريك انكسر وبدأ من جديد
+      embed = new EmbedBuilder()
+        .setColor(0xFF4444) // أحمر
+        .setTitle("❌ فشل الستريك •")
+        .setDescription(`الإجمالي (${result.wasStreak || 0})`)
+        .addFields(
+          { name: "المستخدم", value: `<@${user.id}>`, inline: true },
+          { name: "❌ الستريك السابق", value: `${result.wasStreak || 0}`, inline: true }
+        )
+        .setThumbnail(user.displayAvatarURL())
+        .setFooter({ text: "v1.1.1" });
+    } else {
+      // تم تحديث الستريك بنجاح
+      embed = new EmbedBuilder()
+        .setColor(0x22C55E) // أخضر
+        .setTitle("✅ تم تحديث الستريك •")
+        .addFields(
+          { name: "المستخدم", value: `<@${user.id}>`, inline: true },
+          { name: "🔥", value: `**${result.streak}**`, inline: true }
+        )
+        .setThumbnail(user.displayAvatarURL())
+        .setFooter({ text: "v1.1.1" });
+
+      // إضافة أيقونات المستوى
+      if (result.streak >= 30) {
+        embed.addFields({ name: "🏆 الإنجاز", value: "شهر كامل!", inline: true });
+      } else if (result.streak >= 7) {
+        embed.addFields({ name: "🏆 الإنجاز", value: "أسبوع كامل!", inline: true });
+      }
+    }
+
+    await channel.send({ embeds: [embed] });
+  } catch (err) {
+    console.error("[Streak] Error sending embed:", err);
+  }
+}
+
+// معالج رسائل الستريك
+client.on("messageCreate", async (message) => {
+  // تجاهل البوتات والـDM
+  if (message.author.bot) return;
+  if (!message.inGuild()) return;
+
+  const guildId = message.guildId;
+  const config = getGuildConfig(guildId);
+
+  // التحقق إذا القناة مفعلة للستريك
+  if (!config.streakChannelIds || !config.streakChannelIds.includes(message.channelId)) {
+    return;
+  }
+
+  // التحقق إذا الرسالة تحتوي على ميديا
+  if (!isMediaMessage(message)) {
+    return; // تجاهل الرسائل النصية
+  }
+
+  // تحديث الستريك
+  const result = streakStore.updateStreak(guildId, message.author.id);
+
+  // إرسال embed
+  await sendStreakEmbed(message.channel, message.author, result);
+});
+
+// فحص الستريكات المنتهية كل 24 ساعة
+setInterval(() => {
+  streakStore.checkExpiredStreaks();
+}, 24 * 60 * 60 * 1000);
+
+client.login(token);
