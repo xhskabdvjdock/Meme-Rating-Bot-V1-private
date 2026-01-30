@@ -67,8 +67,8 @@ function startDashboard(client) {
         res.json(channels);
     });
 
-    // الصفحة الرئيسية - catch all (يجب أن تكون في النهاية)
-    app.get("/", (req, res) => {
+    // Catch-all route - يرسل index.html لجميع الطلبات غير الـ API
+    app.get("*", (req, res) => {
         res.sendFile(path.join(__dirname, "..", "dashboard", "index.html"));
     });
 
