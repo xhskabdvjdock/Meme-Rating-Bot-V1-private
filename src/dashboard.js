@@ -22,6 +22,9 @@ if (fs.existsSync(indexPath)) {
     console.log("[Dashboard] ❌ index.html NOT found at:", indexPath);
 }
 
+// Trust proxy for Render (HTTPS behind load balancer)
+app.set('trust proxy', 1);
+
 // Session middleware
 app.use(session({
     secret: process.env.SESSION_SECRET || "meme-rate-secret-key-change-in-production",
@@ -29,6 +32,8 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 أيام
     }
 }));

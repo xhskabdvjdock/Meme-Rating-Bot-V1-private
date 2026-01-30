@@ -82,8 +82,16 @@ router.get("/callback", async (req, res) => {
         req.session.guilds = guildsData;
 
         console.log(`[Auth] User logged in: ${userData.username} (${userData.id})`);
+        console.log(`[Auth] Guilds count: ${guildsData.length}`);
 
-        res.redirect("/");
+        // حفظ الجلسة قبل إعادة التوجيه
+        req.session.save((err) => {
+            if (err) {
+                console.error("[Auth] Session save error:", err);
+                return res.redirect("/?error=session_error");
+            }
+            res.redirect("/");
+        });
 
     } catch (error) {
         console.error("[Auth] Callback error:", error);
