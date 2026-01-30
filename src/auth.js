@@ -109,6 +109,11 @@ router.get("/logout", (req, res) => {
 
 // الحصول على معلومات المستخدم الحالي
 router.get("/api/user", (req, res) => {
+    console.log("[Auth] /api/user called");
+    console.log("[Auth] Session ID:", req.sessionID);
+    console.log("[Auth] Session user:", req.session.user ? req.session.user.username : "none");
+    console.log("[Auth] Cookies:", req.headers.cookie);
+
     if (!req.session.user) {
         return res.json({ loggedIn: false });
     }
