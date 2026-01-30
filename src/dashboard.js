@@ -1,3 +1,4 @@
+// src/dashboard.js
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -5,32 +6,48 @@ const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 
 const app = express();
-// تغيير المنفذ ليتوافق مع Render تلقائياً
-const PORT = process.env.PORT || 3000; 
+
+// استخدام PORT ليتوافق مع نظام Render التلقائي
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// تأكد أن مسار المجلد يشير للمكان الصحيح لملفات index.html و app.js
-// إذا كان مجلد dashboard في المجلد الرئيسي للمشروع:
+// تحديد مجلد ملفات الواجهة (app.js و index.html)
 app.use(express.static(path.join(__dirname, "..", "dashboard")));
 
-// ... (أبقِ جميع مسارات الـ API كما هي)
+// مسارات الـ API
+app.get("/api/guilds/:guildId/config", (req, res) => res.json(getGuildConfig(req.params.guildId)));
+app.patch("/api/guilds/:guildId/config", (req, res) => res.json(setGuildConfig(req.params.guildId, req.body)));
+app.get("/api/guilds/:guildId/leaderboard", (req, res) => res.json(getLeaderboard(req.params.guildId, parseInt(req.query.limit) || 10)));
 
 function startDashboard(client) {
-    // ... (أبقِ مسارات الـ API داخل الدالة كما هي)
+    // جلب قائمة السيرفرات
+    app.get("/api/guilds", (req, res) => {
+        const guilds = client.guilds.cache.map(g => ({
+            id: g.id,
+            name: g.name,
+            icon: g.iconURL({ size: 128 }),
+            memberCount: g.memberCount,
+        }));
+        res.json(guilds);
+    });
 
-    // حل مشكلة Not Found: هذا المسار يعرض ملف الواجهة عند الدخول للرابط الأساسي
-    app.get("/", (req, res) => {
+    app.get("/api/guilds/:guildId/channels", async (req, res) => {
+        const guild = client.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: "Guild not found" });
+        res.json(guild.channels.cache.filter(c => c.type === 0 || c.type === 5).map(c => ({ id: c.id, name: c.name })));
+    });
+
+    // حل مشكلة Not Found: توجيه أي طلب غير معروف إلى صفحة الداشبورد
+    app.get("*", (req, res) => {
         res.sendFile(path.join(__dirname, "..", "dashboard", "index.html"));
     });
 
-    // تشغيل السيرفر على 0.0.0.0 ليتمكن Render من الوصول إليه
+    // الاستماع على المنفذ الصحيح وواجهة الشبكة المطلوبة لـ Render
     app.listen(PORT, "0.0.0.0", () => {
-        console.log(`🚀 [Dashboard] Running at port ${PORT}`);
+        console.log(`🚀 [Dashboard] لوحة التحكم تعمل على المنفذ: ${PORT}`);
     });
 }
 
 module.exports = { startDashboard };
-
-
