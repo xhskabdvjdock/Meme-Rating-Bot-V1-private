@@ -196,12 +196,28 @@ function renderServers() {
 
 
 async function openServer(guildId) {
+    console.log("[Dashboard] Opening server:", guildId);
     currentGuildId = guildId;
-    const guild = guilds.find(g => g.id === guildId);
+
+    // البحث في botGuilds أو userGuilds
+    let guild = botGuilds.find(g => g.id === guildId);
+    if (!guild) {
+        guild = userGuilds.find(g => g.id === guildId);
+    }
+
+    if (!guild) {
+        console.error("[Dashboard] Guild not found:", guildId);
+        alert('حدث خطأ: السيرفر غير موجود');
+        return;
+    }
+
     pageTitle.textContent = guild.name;
 
     // Show sub navigation
     subNav.style.display = 'block';
+
+    // Hide servers page, show system pages
+    serversPage.classList.remove('active');
 
     // Load data
     await Promise.all([
