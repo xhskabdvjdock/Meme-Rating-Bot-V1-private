@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: memes-rate
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
