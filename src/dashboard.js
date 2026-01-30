@@ -24,13 +24,45 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(dashboardPath));
 
+// متغير لتخزين الـ Discord client
+let discordClient = null;
+
 // Health check endpoint
 app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         dashboardPath,
-        indexExists: fs.existsSync(indexPath)
+        indexExists: fs.existsSync(indexPath),
+        discordConnected: discordClient !== null
     });
+});
+
+// الحصول على معلومات السيرفرات
+app.get("/api/guilds", (req, res) => {
+    if (!discordClient) {
+        return res.json([]); // إرجاع مصفوفة فارغة إذا لم يتصل البوت بعد
+    }
+    const guilds = discordClient.guilds.cache.map(g => ({
+        id: g.id,
+        name: g.name,
+        icon: g.iconURL({ size: 128 }),
+        memberCount: g.memberCount,
+    }));
+    res.json(guilds);
+});
+
+// الحصول على قنوات سيرفر
+app.get("/api/guilds/:guildId/channels", async (req, res) => {
+    if (!discordClient) {
+        return res.status(503).json({ error: "Bot not connected" });
+    }
+    const guild = discordClient.guilds.cache.get(req.params.guildId);
+    if (!guild) return res.status(404).json({ error: "Guild not found" });
+
+    const channels = guild.channels.cache
+        .filter(c => c.type === 0 || c.type === 5) // Text & Announcement
+        .map(c => ({ id: c.id, name: c.name, type: c.type }));
+    res.json(channels);
 });
 
 // الحصول على إعدادات سيرفر
@@ -66,8 +98,12 @@ app.delete("/api/guilds/:guildId/stats", (req, res) => {
     res.json({ success: true });
 });
 
-// Catch-all route - يرسل index.html لجميع الطلبات غير الـ API
-app.get("*", (req, res) => {
+// Catch-all route - يجب أن يكون آخر route
+// يستثني مسارات الـ API
+app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+        return next(); // اترك الـ API routes تمر
+    }
     res.sendFile(path.join(dashboardPath, "index.html"));
 });
 
@@ -77,29 +113,8 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 function startDashboard(client) {
-    // إضافة endpoint للحصول على معلومات السيرفرات
-    app.get("/api/guilds", (req, res) => {
-        const guilds = client.guilds.cache.map(g => ({
-            id: g.id,
-            name: g.name,
-            icon: g.iconURL({ size: 128 }),
-            memberCount: g.memberCount,
-        }));
-        res.json(guilds);
-    });
-
-    // الحصول على قنوات سيرفر
-    app.get("/api/guilds/:guildId/channels", async (req, res) => {
-        const guild = client.guilds.cache.get(req.params.guildId);
-        if (!guild) return res.status(404).json({ error: "Guild not found" });
-
-        const channels = guild.channels.cache
-            .filter(c => c.type === 0 || c.type === 5) // Text & Announcement
-            .map(c => ({ id: c.id, name: c.name, type: c.type }));
-        res.json(channels);
-    });
-
-    console.log("[Dashboard] Discord client endpoints registered");
+    discordClient = client;
+    console.log("[Dashboard] Discord client connected and endpoints ready");
 }
 
 module.exports = { startDashboard };
