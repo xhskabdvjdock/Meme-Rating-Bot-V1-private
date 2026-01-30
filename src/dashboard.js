@@ -2,8 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+const session = require("express-session");
 const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
+const authRoutes = require("./auth");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,12 +22,31 @@ if (fs.existsSync(indexPath)) {
     console.log("[Dashboard] ❌ index.html NOT found at:", indexPath);
 }
 
-app.use(cors());
+// Session middleware
+app.use(session({
+    secret: process.env.SESSION_SECRET || "meme-rate-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 أيام
+    }
+}));
+
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.static(dashboardPath));
 
+// Auth routes
+app.use("/auth", authRoutes);
+app.use(authRoutes); // للـ /api/user routes
+
 // متغير لتخزين الـ Discord client
 let discordClient = null;
+
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -98,13 +119,24 @@ app.delete("/api/guilds/:guildId/stats", (req, res) => {
     res.json({ success: true });
 });
 
+// Route للصفحة الرئيسية - تعرض صفحة الهبوط
+app.get("/", (req, res) => {
+    res.sendFile(path.join(dashboardPath, "landing.html"));
+});
+
 // Catch-all route - يجب أن يكون آخر route
-// يستثني مسارات الـ API
+// يستثني مسارات الـ API والملفات الثابتة
 app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) {
+    if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {
         return next(); // اترك الـ API routes تمر
     }
-    res.sendFile(path.join(dashboardPath, "index.html"));
+    // إذا الملف موجود، اتركه يمر (للـ static files)
+    const filePath = path.join(dashboardPath, req.path);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return next();
+    }
+    // وإلا أرسل صفحة الهبوط
+    res.sendFile(path.join(dashboardPath, "landing.html"));
 });
 
 // تشغيل السيرفر فوراً
