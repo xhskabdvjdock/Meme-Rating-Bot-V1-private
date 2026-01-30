@@ -5,50 +5,77 @@ const { getGuildConfig, setGuildConfig } = require("./configStore");
 const { getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "..", "dashboard")));
 
-// تحديد المسار للمجلد الذي يحتوي على واجهة التحكم
-// تأكد أن المجلد في المشروع اسمه "dashboard" بالحروف الصغيرة
-const dashboardPath = path.join(__dirname, "..", "dashboard");
-
-// تشغيل الملفات الثابتة
-app.use(express.static(dashboardPath));
-
-let discordClient = null;
-
-// --- مسارات الـ API ---
-app.get("/api/guilds", (req, res) => {
-    if (!discordClient) return res.status(503).json({ error: "Waiting for bot..." });
-    const guilds = discordClient.guilds.cache.map(g => ({
-        id: g.id,
-        name: g.name,
-        icon: g.iconURL({ size: 128 }),
-        memberCount: g.memberCount,
-    }));
-    res.json(guilds);
+// الحصول على إعدادات سيرفر
+app.get("/api/guilds/:guildId/config", (req, res) => {
+    const config = getGuildConfig(req.params.guildId);
+    res.json(config);
 });
 
-// أي مسار غير معروف، قم بإرسال index.html فوراً
-app.get("*", (req, res) => {
-    res.sendFile(path.join(dashboardPath, "index.html"), (err) => {
-        if (err) {
-            console.error("❌ لم يتم العثور على ملف index.html في المسار:", dashboardPath);
-            res.status(404).send("Dashboard files missing on server");
-        }
-    });
+// تحديث إعدادات سيرفر
+app.patch("/api/guilds/:guildId/config", (req, res) => {
+    const guildId = req.params.guildId;
+    const updates = req.body;
+    const newConfig = setGuildConfig(guildId, updates);
+    res.json(newConfig);
 });
 
-// تشغيل السيرفر
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Dashboard server is running on port ${PORT}`);
+// الحصول على قائمة أسوأ الناشرين
+app.get("/api/guilds/:guildId/leaderboard", (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const leaderboard = getLeaderboard(req.params.guildId, limit);
+    res.json(leaderboard);
+});
+
+// إعادة تعيين إحصائيات مستخدم
+app.delete("/api/guilds/:guildId/stats/:userId", (req, res) => {
+    resetUserStats(req.params.guildId, req.params.userId);
+    res.json({ success: true });
+});
+
+// إعادة تعيين إحصائيات السيرفر
+app.delete("/api/guilds/:guildId/stats", (req, res) => {
+    resetGuildStats(req.params.guildId);
+    res.json({ success: true });
 });
 
 function startDashboard(client) {
-    discordClient = client;
-    console.log("✅ Linked Discord Client to Dashboard");
+    // إضافة endpoint للحصول على معلومات السيرفرات
+    app.get("/api/guilds", (req, res) => {
+        const guilds = client.guilds.cache.map(g => ({
+            id: g.id,
+            name: g.name,
+            icon: g.iconURL({ size: 128 }),
+            memberCount: g.memberCount,
+        }));
+        res.json(guilds);
+    });
+
+    // الحصول على قنوات سيرفر
+    app.get("/api/guilds/:guildId/channels", async (req, res) => {
+        const guild = client.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: "Guild not found" });
+
+        const channels = guild.channels.cache
+            .filter(c => c.type === 0 || c.type === 5) // Text & Announcement
+            .map(c => ({ id: c.id, name: c.name, type: c.type }));
+        res.json(channels);
+    });
+
+    // الصفحة الرئيسية - catch all (يجب أن تكون في النهاية)
+    app.get("/", (req, res) => {
+        res.sendFile(path.join(__dirname, "..", "dashboard", "index.html"));
+    });
+
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`[Dashboard] Running at http://localhost:${PORT}`);
+    });
 }
 
 module.exports = { startDashboard };
+

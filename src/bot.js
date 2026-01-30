@@ -1,20 +1,22 @@
 require("dotenv").config({ path: ".env" });
-// src/bot.js
 const {
   Client,
   GatewayIntentBits,
   Partials,
+  PermissionFlagsBits,
+  ChannelType,
+  EmbedBuilder,
 } = require("discord.js");
 
-const { readPending, removePending } = require("./pendingStore");
+const { getGuildConfig, setGuildConfig } = require("./configStore");
+const { readPending, upsertPending, removePending } = require("./pendingStore");
+const { incrementDeleteCount, getLeaderboard, resetUserStats, resetGuildStats } = require("./statsStore");
 const { startDashboard } = require("./dashboard");
 const gifConverter = require("./gifConverter");
 
-// جلب التوكن من Render Environment
 const token = process.env.DISCORD_TOKEN;
-
 if (!token) {
-  console.error("❌ خطأ: DISCORD_TOKEN غير موجود في إعدادات Render.");
+  console.error("Missing DISCORD_TOKEN. Put it in ./env (see env.example).");
   process.exit(1);
 }
 
@@ -28,30 +30,20 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
+// لتفادي جدولة نفس الرسالة أكثر من مرة أثناء التشغيل
+const scheduled = new Map(); // messageId -> timeoutId
+const continuousIntervals = new Map(); // guildId -> intervalId
+
 // بدء التنظيف الدوري لمجلد temp
-gifConverter.startPeriodicCleanup(60);
+gifConverter.startPeriodicCleanup(60); // كل ساعة
 
-// استخدام clientReady لتفادي التحذيرات
-client.once("clientReady", async () => {
-  console.log(`✅ تم تسجيل الدخول باسم: ${client.user.tag}`);
-
-  // ربط البوت بالداشبورد (الداشبورد تعمل بالفعل في الخلفية)
-  startDashboard(client);
-
-  // معالجة الرسائل المعلقة (Pending)
-  const pending = readPending();
-  const now = Date.now();
-  for (const [messageId, record] of Object.entries(pending)) {
-     if (!record?.endsAtMs) {
-        removePending(messageId);
-        continue;
-     }
-     // ... (بقية منطق الجدولة الخاص بك)
-  }
-});
-
-// تسجيل الدخول
-client.login(token);
+function parseEmojiKey(input) {
+  // Unicode: "✅"
+  // Custom: "<:name:id>" or "<a:name:id>"
+  const m = input.match(/^<a?:([A-Za-z0-9_]+):(\d+)>$/);
+  if (m) return `${m[1]}:${m[2]}`;
+  return input;
+}
 
 function isMemeMessage(message) {
   if (!message.attachments || message.attachments.size === 0) return false;
@@ -621,7 +613,4 @@ function stopContinuousCheck(guildId) {
     console.log(`[Continuous] Stopped checking guild ${guildId}`);
   }
 }
-
-
-
 
