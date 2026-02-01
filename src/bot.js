@@ -727,5 +727,3 @@ client.on("messageCreate", async (message) => {
 setInterval(() => {
   streakStore.checkExpiredStreaks();
 }, 24 * 60 * 60 * 1000);
-
-client.login(token);
