@@ -280,9 +280,17 @@ function showPage(page) {
 // =============== Config ===============
 
 async function loadConfig() {
+    const guildIdToLoad = currentGuildId; // حفظ الـ guildId الحالي
     try {
-        const res = await fetch(`${API}/api/guilds/${currentGuildId}/config`);
-        config = await res.json();
+        const res = await fetch(`${API}/api/guilds/${guildIdToLoad}/config`);
+        const fetchedConfig = await res.json();
+
+        // التحقق إن المستخدم ما غيّر السيرفر أثناء التحميل
+        if (currentGuildId !== guildIdToLoad) {
+            return; // المستخدم غيّر السيرفر، نتجاهل هذا الرد
+        }
+
+        config = fetchedConfig;
 
         // Meme Rate settings
         document.getElementById('mode-select').value = config.mode || 'timed';
@@ -303,7 +311,9 @@ async function loadConfig() {
         renderGifChannelSelect();
     } catch (err) {
         console.error('Error loading config:', err);
-        showToast('خطأ في تحميل الإعدادات', 'error');
+        if (currentGuildId === guildIdToLoad) {
+            showToast('خطأ في تحميل الإعدادات', 'error');
+        }
     }
 }
 
@@ -315,12 +325,20 @@ function updateIntervalVisibility() {
 document.getElementById('mode-select').addEventListener('change', updateIntervalVisibility);
 
 async function loadChannels() {
+    const guildIdToLoad = currentGuildId; // حفظ الـ guildId الحالي
     try {
-        const res = await fetch(`${API}/api/guilds/${currentGuildId}/channels`);
-        channels = await res.json();
+        const res = await fetch(`${API}/api/guilds/${guildIdToLoad}/channels`);
+        const fetchedChannels = await res.json();
+
+        // التحقق إن المستخدم ما غيّر السيرفر أثناء التحميل
+        if (currentGuildId === guildIdToLoad) {
+            channels = fetchedChannels;
+        }
     } catch (err) {
         console.error('Error loading channels:', err);
-        channels = [];
+        if (currentGuildId === guildIdToLoad) {
+            channels = [];
+        }
     }
 }
 
