@@ -83,13 +83,23 @@ app.get("/api/guilds/:guildId/channels", async (req, res) => {
     if (!discordClient) {
         return res.status(503).json({ error: "Bot not connected" });
     }
-    const guild = discordClient.guilds.cache.get(req.params.guildId);
-    if (!guild) return res.status(404).json({ error: "Guild not found" });
 
-    const channels = guild.channels.cache
-        .filter(c => c.type === 0 || c.type === 5) // Text & Announcement
-        .map(c => ({ id: c.id, name: c.name, type: c.type }));
-    res.json(channels);
+    try {
+        const guild = await discordClient.guilds.fetch(req.params.guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: "Guild not found" });
+
+        // جلب جميع القنوات من Discord API
+        const fetchedChannels = await guild.channels.fetch();
+
+        const channels = fetchedChannels
+            .filter(c => c && (c.type === 0 || c.type === 5)) // Text & Announcement
+            .map(c => ({ id: c.id, name: c.name, type: c.type }));
+
+        res.json(channels);
+    } catch (err) {
+        console.error("[Dashboard] Error fetching channels:", err);
+        res.status(500).json({ error: "Failed to fetch channels" });
+    }
 });
 
 // الحصول على إعدادات سيرفر
