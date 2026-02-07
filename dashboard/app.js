@@ -20,7 +20,17 @@ const pageTitle = document.getElementById('page-title');
 const serversList = document.getElementById('servers-list');
 const subNav = document.getElementById('sub-nav');
 const userSection = document.getElementById('user-section');
+const express = require('express')
+const app = express()
+const port = process.env.PORT || 4000
 
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
+
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+})
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
@@ -713,3 +723,4 @@ async function loadStreakLeaderboard() {
         container.innerHTML = '<p class="empty-state">خطأ في تحميل البيانات</p>';
     }
 }
+
