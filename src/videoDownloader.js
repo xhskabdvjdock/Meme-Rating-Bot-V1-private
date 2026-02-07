@@ -189,6 +189,61 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
 }
 
 /**
+ * الحصول على رابط تحميل مباشر (بدون تحميل الملف)
+ * مفيد للملفات الكبيرة التي تتجاوز حد Discord
+ */
+async function getDirectDownloadUrl(url, format = 'mp4', quality = 'best') {
+    try {
+        console.log(`[yt-dlp] Getting direct download URL: ${url} (${format}, ${quality})`);
+
+        let formatFilter;
+
+        // Audio-only mode
+        if (format === 'mp3') {
+            formatFilter = 'bestaudio';
+        } else {
+            // Video mode with quality selection
+            if (quality === 'best') {
+                formatFilter = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+            } else if (quality === '720') {
+                formatFilter = `bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]`;
+            } else if (quality === '480') {
+                formatFilter = `bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]`;
+            }
+        }
+
+        const info = await ytdlp(url, {
+            dumpSingleJson: true,
+            format: formatFilter,
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true,
+        });
+
+        // Get the direct URL
+        let directUrl = info.url;
+
+        // If it's a combination of video+audio, get the video URL
+        if (info.requested_formats && info.requested_formats.length > 0) {
+            directUrl = info.requested_formats[0].url;
+        }
+
+        console.log(`[yt-dlp] Got direct URL (expires in ~6 hours)`);
+
+        return {
+            url: directUrl,
+            title: info.title || 'video',
+            filesize: info.filesize || info.filesize_approx || 0,
+            ext: info.ext || (format === 'mp3' ? 'mp3' : 'mp4')
+        };
+
+    } catch (error) {
+        console.error(`[yt-dlp] Failed to get direct URL:`, error.message);
+        throw new Error('فشل في الحصول على رابط التحميل');
+    }
+}
+
+/**
  * تحويل فيديو إلى MP3 (not needed with yt-dlp, keeping for compatibility)
  */
 async function convertToMp3(videoPath) {
@@ -260,6 +315,7 @@ module.exports = {
     detectVideoUrls,
     getVideoInfo,
     downloadVideo,
+    getDirectDownloadUrl,
     convertToMp3,
     compressVideo,
     getFileSize,
