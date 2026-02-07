@@ -12,7 +12,7 @@ const { pipeline } = require('stream/promises');
 // إعدادات
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB Discord limit
-const COBALT_API = 'https://api.cobalt.tools/api/json';
+const COBALT_API = 'https://api.cobalt.tools';
 
 // أنماط الروابط المدعومة
 const URL_PATTERNS = {
@@ -24,6 +24,20 @@ const URL_PATTERNS = {
 // إنشاء مجلد temp إذا لم يكن موجوداً
 if (!fs.existsSync(TEMP_DIR)) {
     fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+/**
+ * الحصول على اسم المنصة
+ */
+function getPlatformName(platform) {
+    const names = {
+        youtube: 'YouTube',
+        tiktok: 'TikTok',
+        instagram: 'Instagram',
+        twitter: 'Twitter',
+        x: 'X',
+    };
+    return names[platform] || platform;
 }
 
 /**
@@ -52,12 +66,12 @@ async function getVideoInfo(url) {
     try {
         const response = await axios.post(COBALT_API, {
             url: url,
-            vCodec: 'h264',
-            vQuality: '720',
-            aFormat: 'mp3',
-            filenamePattern: 'basic',
-            isAudioOnly: false,
-            isNoTTWatermark: true
+            videoQuality: '720',
+            audioFormat: 'mp3',
+            filenameStyle: 'basic',
+            downloadMode: 'auto',
+            youtubeVideoCodec: 'h264',
+            alwaysProxy: true
         }, {
             headers: {
                 'Accept': 'application/json',
@@ -70,11 +84,12 @@ async function getVideoInfo(url) {
             throw new Error(response.data.text || 'فشل في الحصول على معلومات الفيديو');
         }
 
+        // Cobalt v10 structure mapping
         return {
             title: response.data.filename || 'video',
-            thumbnail: response.data.thumbnail || null,
-            duration: null, // Cobalt doesn't provide duration
-            uploader: null, // Cobalt doesn't provide uploader
+            thumbnail: null, // Cobalt v10 might not provide thumbnail in direct response
+            duration: null,
+            uploader: null,
             url: url
         };
     } catch (error) {
@@ -91,26 +106,26 @@ async function getVideoInfo(url) {
 async function downloadVideo(url, format = 'mp4', quality = 'best') {
     try {
         // تحديد الإعدادات حسب الجودة والتنسيق
-        const isAudioOnly = format === 'mp3';
-        let vQuality = '720';
+        const downloadMode = format === 'mp3' ? 'audio' : 'auto';
+        let videoQuality = '720';
 
         if (quality === 'best') {
-            vQuality = '1080';
+            videoQuality = 'max';
         } else if (quality === '720') {
-            vQuality = '720';
+            videoQuality = '720';
         } else if (quality === '480') {
-            vQuality = '480';
+            videoQuality = '480';
         }
 
         // طلب التحميل من Cobalt
         const response = await axios.post(COBALT_API, {
             url: url,
-            vCodec: 'h264',
-            vQuality: vQuality,
-            aFormat: 'mp3',
-            filenamePattern: 'basic',
-            isAudioOnly: isAudioOnly,
-            isNoTTWatermark: true
+            videoQuality: videoQuality,
+            audioFormat: 'mp3',
+            filenameStyle: 'basic',
+            downloadMode: downloadMode,
+            youtubeVideoCodec: 'h264',
+            alwaysProxy: true
         }, {
             headers: {
                 'Accept': 'application/json',
@@ -120,7 +135,11 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
         });
 
         if (response.data.status === 'error' || response.data.status === 'rate-limit') {
-            throw new Error(response.data.text || 'فشل في التحميل');
+            throw new Error(response.data.text || 'فشل في التحميل: ' + (response.data.text || 'Unknown error'));
+        }
+
+        if (response.data.status === 'picker') {
+            throw new Error('الرابط يحتوي على عدة وسائط، يرجى اختيار واحد (غير مدعوم حالياً)');
         }
 
         if (!response.data.url) {
@@ -129,7 +148,7 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
 
         // تنزيل الملف
         const downloadUrl = response.data.url;
-        const extension = isAudioOnly ? '.mp3' : '.mp4';
+        const extension = format === 'mp3' ? '.mp3' : '.mp4';
         const filename = `download_${Date.now()}${extension}`;
         const filepath = path.join(TEMP_DIR, filename);
 
@@ -162,7 +181,6 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
  * لا نحتاج convertToMp3 لأن Cobalt يدعم MP3 مباشرة
  */
 async function convertToMp3(videoPath) {
-    // Cobalt API يحمل MP3 مباشرة، لكن نبقي الدالة للتوافق
     return videoPath;
 }
 
@@ -170,8 +188,6 @@ async function convertToMp3(videoPath) {
  * ضغط الفيديو (مبسط - نحاول تحميل بجودة أقل)
  */
 async function compressVideo(videoPath) {
-    // مع Cobalt، الضغط يتم عن طريق طلب جودة أقل من البداية
-    // هذه الدالة موجودة فقط للتوافق مع الكود القديم
     console.log('[Cobalt] Compression handled by quality selection');
     return videoPath;
 }
@@ -236,6 +252,7 @@ module.exports = {
     compressVideo,
     getFileSize,
     deleteFile,
+    getPlatformName,
     MAX_FILE_SIZE,
     TEMP_DIR
 };
