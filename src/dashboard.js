@@ -161,9 +161,9 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(dashboardPath, "landing.html"));
 });
 
-// Catch-all route - يجب أن يكون آخر route
+// Catch-all middleware - يجب أن يكون آخر middleware
 // يستثني مسارات الـ API والملفات الثابتة
-app.get("/*", (req, res, next) => {
+app.use((req, res, next) => {
     if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {
         return next(); // اترك الـ API routes تمر
     }
