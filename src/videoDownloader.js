@@ -27,6 +27,25 @@ if (!fs.existsSync(TEMP_DIR)) {
 }
 
 /**
+ * تنسيق الوقت (ثواني -> HH:MM:SS)
+ */
+function formatDuration(duration) {
+    if (!duration) return '00:00';
+    const seconds = Math.floor(duration);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+
+    const mDisplay = m < 10 ? `0${m}` : m;
+    const sDisplay = s < 10 ? `0${s}` : s;
+
+    if (h > 0) {
+        return `${h}:${mDisplay}:${sDisplay}`;
+    }
+    return `${mDisplay}:${sDisplay}`;
+}
+
+/**
  * الحصول على اسم المنصة
  */
 function getPlatformName(platform) {
@@ -66,16 +85,13 @@ async function getVideoInfo(url) {
     try {
         const response = await axios.post(COBALT_API, {
             url: url,
-            videoQuality: '720',
-            audioFormat: 'mp3',
-            filenameStyle: 'basic',
-            downloadMode: 'auto',
-            youtubeVideoCodec: 'h264',
-            alwaysProxy: true
         }, {
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Origin': 'https://cobalt.tools',
+                'Referer': 'https://cobalt.tools/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             timeout: 30000
         });
@@ -84,15 +100,17 @@ async function getVideoInfo(url) {
             throw new Error(response.data.text || 'فشل في الحصول على معلومات الفيديو');
         }
 
-        // Cobalt v10 structure mapping
         return {
             title: response.data.filename || 'video',
-            thumbnail: null, // Cobalt v10 might not provide thumbnail in direct response
-            duration: null,
+            thumbnail: null,
+            duration: 0,
             uploader: null,
             url: url
         };
     } catch (error) {
+        if (error.response?.status === 400) {
+            throw new Error('الرابط غير صالح أو الخدمة لا تدعمه حالياً (400)');
+        }
         if (error.response?.status === 429) {
             throw new Error('تم تجاوز حد الطلبات. حاول مجدداً بعد قليل');
         }
@@ -105,31 +123,24 @@ async function getVideoInfo(url) {
  */
 async function downloadVideo(url, format = 'mp4', quality = 'best') {
     try {
-        // تحديد الإعدادات حسب الجودة والتنسيق
         const downloadMode = format === 'mp3' ? 'audio' : 'auto';
-        let videoQuality = '720';
 
-        if (quality === 'best') {
-            videoQuality = 'max';
-        } else if (quality === '720') {
-            videoQuality = '720';
-        } else if (quality === '480') {
-            videoQuality = '480';
+        const payload = {
+            url: url,
+            downloadMode: downloadMode,
+        };
+
+        if (quality !== 'best' && format !== 'mp3') {
+            payload.videoQuality = quality;
         }
 
-        // طلب التحميل من Cobalt
-        const response = await axios.post(COBALT_API, {
-            url: url,
-            videoQuality: videoQuality,
-            audioFormat: 'mp3',
-            filenameStyle: 'basic',
-            downloadMode: downloadMode,
-            youtubeVideoCodec: 'h264',
-            alwaysProxy: true
-        }, {
+        const response = await axios.post(COBALT_API, payload, {
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Origin': 'https://cobalt.tools',
+                'Referer': 'https://cobalt.tools/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             timeout: 60000
         });
@@ -177,24 +188,15 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
     }
 }
 
-/**
- * لا نحتاج convertToMp3 لأن Cobalt يدعم MP3 مباشرة
- */
 async function convertToMp3(videoPath) {
     return videoPath;
 }
 
-/**
- * ضغط الفيديو (مبسط - نحاول تحميل بجودة أقل)
- */
 async function compressVideo(videoPath) {
     console.log('[Cobalt] Compression handled by quality selection');
     return videoPath;
 }
 
-/**
- * الحصول على حجم الملف
- */
 function getFileSize(filePath) {
     try {
         const stats = fs.statSync(filePath);
@@ -205,9 +207,6 @@ function getFileSize(filePath) {
     }
 }
 
-/**
- * حذف ملف
- */
 function deleteFile(filePath) {
     try {
         if (fs.existsSync(filePath)) {
@@ -219,9 +218,6 @@ function deleteFile(filePath) {
     }
 }
 
-/**
- * تنظيف المجلد المؤقت (حذف الملفات القديمة)
- */
 function cleanupTempDir() {
     try {
         const files = fs.readdirSync(TEMP_DIR);
@@ -241,7 +237,6 @@ function cleanupTempDir() {
     }
 }
 
-// تنظيف دوري كل 30 دقيقة
 setInterval(cleanupTempDir, 30 * 60 * 1000);
 
 module.exports = {
@@ -253,6 +248,7 @@ module.exports = {
     getFileSize,
     deleteFile,
     getPlatformName,
+    formatDuration,
     MAX_FILE_SIZE,
     TEMP_DIR
 };
