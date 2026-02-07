@@ -20,6 +20,7 @@ const {
   detectVideoUrls,
   getVideoInfo,
   downloadVideo,
+  getDirectDownloadUrl,
   convertToMp3,
   compressVideo,
   getFileSize,
@@ -244,25 +245,36 @@ client.on("interactionCreate", async (interaction) => {
           let fileSize = getFileSize(filePath);
           console.log(`[VideoDownload] File size: ${(fileSize / 1024 / 1024).toFixed(2)}MB`);
 
-          // إذا الملف كبير جداً، نحاول الضغط
-          if (fileSize > MAX_FILE_SIZE && format === 'mp4') {
-            console.log(`[VideoDownload] File too large, compressing...`);
-            try {
-              filePath = await compressVideo(filePath);
-              fileSize = getFileSize(filePath);
-            } catch (err) {
-              console.error(`[VideoDownload] Compression failed:`, err.message);
-            }
-          }
-
-          // إذا لا يزال كبيراً
+          // إذا الملف كبير جداً (أكثر من 25MB Discord limit)
           if (fileSize > MAX_FILE_SIZE) {
+            console.log(`[VideoDownload] File too large (${(fileSize / 1024 / 1024).toFixed(1)}MB), getting direct download URL...`);
             deleteFile(filePath);
-            await interaction.editReply({
-              content: `❌ الملف كبير جداً (${(fileSize / 1024 / 1024).toFixed(1)}MB)\n💡 جرب تحميل بجودة أقل أو استخدم موقع تحميل خارجي`,
-            });
-            deleteJob(jobId);
-            return;
+
+            try {
+              // Get direct download URL instead
+              const directDownload = await getDirectDownloadUrl(job.url, format, quality);
+              const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+              const remaining = getRemainingRequests(interaction.user.id);
+
+              await interaction.editReply({
+                content: `📦 **الملف كبير جداً للتحميل المباشر** (${(fileSize / 1024 / 1024).toFixed(1)}MB)\n\n` +
+                  `✅ **تم إنشاء رابط التحميل:**\n` +
+                  `🔗 [اضغط هنا للتحميل](${directDownload.url})\n\n` +
+                  `⚠️ **ملاحظة:** الرابط صالح لمدة 6 ساعات تقريباً\n` +
+                  `⏱️ الوقت: ${elapsed}ث | 📥 المتبقي لك: ${remaining} تحميلات في الساعة`,
+              });
+
+              console.log(`[VideoDownload] Sent direct download URL to ${interaction.user.tag}`);
+              deleteJob(jobId);
+              return;
+            } catch (urlError) {
+              console.error(`[VideoDownload] Failed to get direct URL:`, urlError.message);
+              await interaction.editReply({
+                content: `❌ الملف كبير جداً (${(fileSize / 1024 / 1024).toFixed(1)}MB)\n💡 جرب تحميل بجودة أقل (480p أو 720p)`,
+              });
+              deleteJob(jobId);
+              return;
+            }
           }
 
           // إرسال الملف
