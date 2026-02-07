@@ -87,10 +87,10 @@ async function getVideoInfo(url) {
         const info = await ytdlp(url, {
             dumpSingleJson: true,
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
             preferFreeFormats: true,
-            youtubeSkipDashManifest: true,
+            // Use Android client to bypass bot detection
+            extractorArgs: 'youtube:player_client=android',
         });
 
         return {
@@ -127,12 +127,13 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
         let options = {
             output: outputTemplate,
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
             preferFreeFormats: true,
+            // Use Android client to bypass YouTube bot detection
+            extractorArgs: 'youtube:player_client=android',
             addHeader: [
                 'referer:youtube.com',
-                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'user-agent:Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36'
             ],
         };
 
@@ -216,8 +217,9 @@ async function getDirectDownloadUrl(url, format = 'mp4', quality = 'best') {
             dumpSingleJson: true,
             format: formatFilter,
             noWarnings: true,
-            noCallHome: true,
             noCheckCertificate: true,
+            // Use Android client to bypass bot detection
+            extractorArgs: 'youtube:player_client=android',
         });
 
         // Get the direct URL
