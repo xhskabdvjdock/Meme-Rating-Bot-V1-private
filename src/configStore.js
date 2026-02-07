@@ -19,16 +19,6 @@ const DEFAULT_GUILD_CONFIG = {
   enabledChannelIds: [],
   durationMinutes: 10,
   emojis: { positive: "✅", negative: "❌" },
-  mode: "timed", // "timed" = فحص مرة واحدة بعد انتهاء المدة | "continuous" = فحص مستمر
-  checkIntervalSeconds: 30, // الفترة بين كل فحص في الوضع المستمر (بالثواني)
-  logChannelId: null, // قناة سجل الميمز المحذوفة
-  // إعدادات GIF
-  gifChannelIds: [], // قنوات تحويل GIF
-  gifQuality: "medium", // low | medium | high
-  gifDuration: 5, // مدة الفيديو بالثواني
-  gifAutoEnabled: true, // التحويل التلقائي
-  // إعدادات الستريك
-  streakChannelIds: [], // قنوات الستريك اليومي
 };
 
 function ensureDataFile() {
