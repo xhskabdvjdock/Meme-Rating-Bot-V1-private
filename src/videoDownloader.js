@@ -12,7 +12,8 @@ const { pipeline } = require('stream/promises');
 // إعدادات
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB Discord limit
-const COBALT_API = 'https://api.cobalt.tools';
+// Default to official API (requires private instance or auth for heavy use)
+const COBALT_API = process.env.COBALT_API_URL || 'https://api.cobalt.tools';
 
 // أنماط الروابط المدعومة
 const URL_PATTERNS = {
@@ -83,9 +84,23 @@ function detectVideoUrls(content) {
  */
 async function getVideoInfo(url) {
     try {
-        const response = await axios.post(COBALT_API, {
-            url: url,
-        }, {
+        const isV10 = !COBALT_API.includes('/api/json');
+
+        let payload = {};
+        if (isV10) {
+            payload = {
+                url: url,
+            };
+        } else {
+            // v7 payload
+            payload = {
+                url: url,
+                vQuality: '720',
+                filenamePattern: 'basic'
+            };
+        }
+
+        const response = await axios.post(COBALT_API, payload, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
@@ -108,8 +123,8 @@ async function getVideoInfo(url) {
             url: url
         };
     } catch (error) {
-        if (error.response?.status === 400) {
-            throw new Error('الرابط غير صالح أو الخدمة لا تدعمه حالياً (400)');
+        if (error.response?.status === 400 || error.response?.status === 401 || error.response?.status === 403) {
+            throw new Error(`تعذر الوصول لخدمة التحميل (${error.response.status}). يرجى التحقق من إعدادات COBALT_API_URL.`);
         }
         if (error.response?.status === 429) {
             throw new Error('تم تجاوز حد الطلبات. حاول مجدداً بعد قليل');
@@ -124,14 +139,36 @@ async function getVideoInfo(url) {
 async function downloadVideo(url, format = 'mp4', quality = 'best') {
     try {
         const downloadMode = format === 'mp3' ? 'audio' : 'auto';
+        const isV10 = !COBALT_API.includes('/api/json');
 
-        const payload = {
-            url: url,
-            downloadMode: downloadMode,
-        };
+        let payload = {};
+        let videoQuality = '720';
 
-        if (quality !== 'best' && format !== 'mp3') {
-            payload.videoQuality = quality;
+        if (quality === 'best') videoQuality = 'max';
+        else if (quality === '720') videoQuality = '720';
+        else if (quality === '480') videoQuality = '480';
+
+        if (isV10) {
+            payload = {
+                url: url,
+                videoQuality: quality === 'best' ? 'max' : quality,
+                audioFormat: 'mp3',
+                filenameStyle: 'basic',
+                downloadMode: downloadMode,
+                youtubeVideoCodec: 'h264',
+                alwaysProxy: true
+            };
+        } else {
+            // v7 payload
+            payload = {
+                url: url,
+                vQuality: videoQuality,
+                aFormat: 'mp3',
+                filenamePattern: 'basic',
+                isAudioOnly: downloadMode === 'audio',
+                vCodec: 'h264',
+                isNoTTWatermark: true
+            };
         }
 
         const response = await axios.post(COBALT_API, payload, {
@@ -181,6 +218,9 @@ async function downloadVideo(url, format = 'mp4', quality = 'best') {
         return filepath;
 
     } catch (error) {
+        if (error.response?.status === 400 || error.response?.status === 401 || error.response?.status === 403) {
+            throw new Error(`تعذر التحميل (${error.response.status}). يرجى التحقق من إعدادات COBALT_API_URL.`);
+        }
         if (error.response?.status === 429) {
             throw new Error('تم تجاوز حد الطلبات. حاول مجدداً بعد قليل');
         }
