@@ -181,11 +181,13 @@ client.on("interactionCreate", async (interaction) => {
       const ownerId = parts[3];
       const jobId = parts.slice(4).join('_');
 
+      // الرد بأن التحميل قيد التحضير (يجب أن يكون أول شيء لتجنب timeout)
+      await interaction.deferReply();
+
       // التحقق من الملكية
       if (interaction.user.id !== ownerId) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ هذا الزر مخصص لشخص آخر!',
-          ephemeral: true,
         });
         return;
       }
@@ -193,9 +195,8 @@ client.on("interactionCreate", async (interaction) => {
       // جلب الـ job
       const job = getJob(jobId);
       if (!job) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ انتهت صلاحية هذا الطلب. أرسل الرابط مجدداً.',
-          ephemeral: true,
         });
         return;
       }
@@ -204,15 +205,11 @@ client.on("interactionCreate", async (interaction) => {
       if (!checkRateLimit(interaction.user.id)) {
         const resetMs = getRateLimitReset(interaction.user.id);
         const resetMins = Math.ceil(resetMs / 60000);
-        await interaction.reply({
+        await interaction.editReply({
           content: `⚠️ تجاوزت الحد المسموح (5 تحميلات في الساعة)\n⏰ يمكنك المحاولة مجدداً بعد ${resetMins} دقيقة`,
-          ephemeral: true,
         });
         return;
       }
-
-      // الرد بأن التحميل قيد التحضير
-      await interaction.deferReply();
 
       // إضافة للـ queue
       try {
