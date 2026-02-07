@@ -176,14 +176,20 @@ app.get("*", (req, res, next) => {
     res.sendFile(path.join(dashboardPath, "landing.html"));
 });
 
-// تشغيل السيرفر فوراً
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Dashboard] Running at http://localhost:${PORT}`);
-});
+// متغير لحفظ الـ server instance
+let serverInstance = null;
 
 function startDashboard(client) {
     discordClient = client;
-    console.log("[Dashboard] Discord client connected and endpoints ready");
+    console.log("[Dashboard] Discord client connected");
+
+    // بدء Express server فقط إذا لم يكن يعمل
+    if (!serverInstance) {
+        serverInstance = app.listen(PORT, '0.0.0.0', () => {
+            console.log(`[Dashboard] ✅ Running at http://localhost:${PORT}`);
+            console.log(`[Dashboard] Health check: http://localhost:${PORT}/health`);
+        });
+    }
 }
 
 module.exports = { startDashboard };
