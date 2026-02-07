@@ -1,25 +1,24 @@
 /**
- * Video Downloader Module - Using Cobalt API
- * تحميل الفيديوهات من YouTube, TikTok, Instagram باستخدام Cobalt API
+ * Video Downloader Module - Using yt-dlp-exec
+ * تحميل الفيديوهات من YouTube, TikTok, Instagram وأكثر من 1000 موقع
+ * 
+ * Same technology used by professional Telegram bots!
  */
 
-const axios = require('axios');
+const ytdlp = require('yt-dlp-exec');
 const path = require('path');
 const fs = require('fs');
-const { createWriteStream } = require('fs');
-const { pipeline } = require('stream/promises');
 
 // إعدادات
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB Discord limit
-// Default to official API (requires private instance or auth for heavy use)
-const COBALT_API = process.env.COBALT_API_URL || 'https://api.cobalt.tools';
 
 // أنماط الروابط المدعومة
 const URL_PATTERNS = {
     youtube: /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[\w-]+/gi,
     tiktok: /(?:https?:\/\/)?(?:www\.)?(?:vm\.)?tiktok\.com\/[@\w\/-]+/gi,
     instagram: /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:reel|p)\/[\w-]+/gi,
+    twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/\d+/gi,
 };
 
 // إنشاء مجلد temp إذا لم يكن موجوداً
@@ -54,8 +53,7 @@ function getPlatformName(platform) {
         youtube: 'YouTube',
         tiktok: 'TikTok',
         instagram: 'Instagram',
-        twitter: 'Twitter',
-        x: 'X',
+        twitter: 'Twitter/X',
     };
     return names[platform] || platform;
 }
@@ -80,184 +78,162 @@ function detectVideoUrls(content) {
 }
 
 /**
- * الحصول على معلومات الفيديو من Cobalt API
+ * الحصول على معلومات الفيديو من yt-dlp
  */
 async function getVideoInfo(url) {
     try {
-        const isV10 = !COBALT_API.includes('/api/json');
+        console.log(`[yt-dlp] Fetching info for: ${url}`);
 
-        let payload = {};
-        if (isV10) {
-            payload = {
-                url: url,
-            };
-        } else {
-            // v7 payload
-            payload = {
-                url: url,
-                vQuality: '720',
-                filenamePattern: 'basic'
-            };
-        }
-
-        const response = await axios.post(COBALT_API, payload, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Origin': 'https://cobalt.tools',
-                'Referer': 'https://cobalt.tools/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 30000
+        const info = await ytdlp(url, {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true,
+            preferFreeFormats: true,
+            youtubeSkipDashManifest: true,
         });
 
-        if (response.data.status === 'error' || response.data.status === 'rate-limit') {
-            throw new Error(response.data.text || 'فشل في الحصول على معلومات الفيديو');
-        }
-
         return {
-            title: response.data.filename || 'video',
-            thumbnail: null,
-            duration: 0,
-            uploader: null,
+            title: info.title || 'video',
+            thumbnail: info.thumbnail || null,
+            duration: info.duration || 0,
+            author: info.uploader || info.channel || 'Unknown',
             url: url
         };
     } catch (error) {
-        if (error.response?.status === 400 || error.response?.status === 401 || error.response?.status === 403) {
-            throw new Error(`تعذر الوصول لخدمة التحميل (${error.response.status}). يرجى التحقق من إعدادات COBALT_API_URL.`);
-        }
-        if (error.response?.status === 429) {
-            throw new Error('تم تجاوز حد الطلبات. حاول مجدداً بعد قليل');
-        }
-        throw new Error(error.response?.data?.text || error.message || 'فشل في الحصول على معلومات الفيديو');
+        console.error(`[yt-dlp] Failed to get video info:`, error.message);
+
+        // Return basic info if metadata fetch fails
+        return {
+            title: 'فيديو',
+            thumbnail: null,
+            duration: 0,
+            author: 'غير معروف',
+            url: url
+        };
     }
 }
 
 /**
- * تحميل الفيديو باستخدام Cobalt API
+ * تحميل الفيديو باستخدام yt-dlp
  */
 async function downloadVideo(url, format = 'mp4', quality = 'best') {
     try {
-        const downloadMode = format === 'mp3' ? 'audio' : 'auto';
-        const isV10 = !COBALT_API.includes('/api/json');
+        const filename = `download_${Date.now()}`;
+        const outputTemplate = path.join(TEMP_DIR, `${filename}.%(ext)s`);
 
-        let payload = {};
-        let videoQuality = '720';
+        console.log(`[yt-dlp] Downloading: ${url} (${format}, ${quality})`);
 
-        if (quality === 'best') videoQuality = 'max';
-        else if (quality === '720') videoQuality = '720';
-        else if (quality === '480') videoQuality = '480';
+        let options = {
+            output: outputTemplate,
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true,
+            preferFreeFormats: true,
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ],
+        };
 
-        if (isV10) {
-            payload = {
-                url: url,
-                videoQuality: quality === 'best' ? 'max' : quality,
-                audioFormat: 'mp3',
-                filenameStyle: 'basic',
-                downloadMode: downloadMode,
-                youtubeVideoCodec: 'h264',
-                alwaysProxy: true
-            };
+        // Audio-only mode
+        if (format === 'mp3') {
+            options.extractAudio = true;
+            options.audioFormat = 'mp3';
+            options.audioQuality = '192K';
         } else {
-            // v7 payload
-            payload = {
-                url: url,
-                vQuality: videoQuality,
-                aFormat: 'mp3',
-                filenamePattern: 'basic',
-                isAudioOnly: downloadMode === 'audio',
-                vCodec: 'h264',
-                isNoTTWatermark: true
-            };
+            // Video mode with quality selection
+            if (quality === 'best') {
+                options.format = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+            } else if (quality === '720') {
+                options.format = `bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]`;
+            } else if (quality === '480') {
+                options.format = `bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]`;
+            }
+
+            // Merge to mp4
+            options.mergeOutputFormat = 'mp4';
+            options.remuxVideo = 'mp4';
         }
 
-        const response = await axios.post(COBALT_API, payload, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Origin': 'https://cobalt.tools',
-                'Referer': 'https://cobalt.tools/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 60000
-        });
+        await ytdlp(url, options);
 
-        if (response.data.status === 'error' || response.data.status === 'rate-limit') {
-            throw new Error(response.data.text || 'فشل في التحميل: ' + (response.data.text || 'Unknown error'));
+        // Find the downloaded file
+        const files = fs.readdirSync(TEMP_DIR);
+        const downloadedFile = files.find(f => f.startsWith(filename));
+
+        if (!downloadedFile) {
+            throw new Error('لم يتم العثور على الملف المحمل');
         }
 
-        if (response.data.status === 'picker') {
-            throw new Error('الرابط يحتوي على عدة وسائط، يرجى اختيار واحد (غير مدعوم حالياً)');
-        }
+        const filepath = path.join(TEMP_DIR, downloadedFile);
+        console.log(`[yt-dlp] Downloaded to: ${filepath}`);
 
-        if (!response.data.url) {
-            throw new Error('لم يتم الحصول على رابط التحميل');
-        }
-
-        // تنزيل الملف
-        const downloadUrl = response.data.url;
-        const extension = format === 'mp3' ? '.mp3' : '.mp4';
-        const filename = `download_${Date.now()}${extension}`;
-        const filepath = path.join(TEMP_DIR, filename);
-
-        console.log(`[Cobalt] Downloading from: ${downloadUrl}`);
-
-        const fileResponse = await axios({
-            method: 'GET',
-            url: downloadUrl,
-            responseType: 'stream',
-            timeout: 120000,
-            maxContentLength: 100 * 1024 * 1024, // 100MB max
-            maxBodyLength: 100 * 1024 * 1024
-        });
-
-        const writer = createWriteStream(filepath);
-        await pipeline(fileResponse.data, writer);
-
-        console.log(`[Cobalt] Downloaded to: ${filepath}`);
         return filepath;
 
     } catch (error) {
-        if (error.response?.status === 400 || error.response?.status === 401 || error.response?.status === 403) {
-            throw new Error(`تعذر التحميل (${error.response.status}). يرجى التحقق من إعدادات COBALT_API_URL.`);
+        console.error(`[yt-dlp] Download failed:`, error.message);
+
+        if (error.message.includes('Unsupported URL')) {
+            throw new Error('الرابط غير مدعوم. جرب رابط من YouTube أو TikTok أو Instagram');
         }
-        if (error.response?.status === 429) {
-            throw new Error('تم تجاوز حد الطلبات. حاول مجدداً بعد قليل');
+        if (error.message.includes('Video unavailable')) {
+            throw new Error('الفيديو غير متوفر أو محذوف');
         }
-        throw new Error(error.response?.data?.text || error.message || 'فشل في التحميل');
+        if (error.message.includes('Private video')) {
+            throw new Error('الفيديو خاص ولا يمكن تحميله');
+        }
+
+        throw new Error(error.message || 'فشل في التحميل');
     }
 }
 
+/**
+ * تحويل فيديو إلى MP3 (not needed with yt-dlp, keeping for compatibility)
+ */
 async function convertToMp3(videoPath) {
+    // yt-dlp handles this automatically
     return videoPath;
 }
 
+/**
+ * ضغط الفيديو (not needed with quality selection, keeping for compatibility)
+ */
 async function compressVideo(videoPath) {
-    console.log('[Cobalt] Compression handled by quality selection');
+    console.log('[yt-dlp] Compression handled by quality selection');
     return videoPath;
 }
 
+/**
+ * الحصول على حجم الملف
+ */
 function getFileSize(filePath) {
     try {
         const stats = fs.statSync(filePath);
         return stats.size;
     } catch (error) {
-        console.error('[Cobalt] Error getting file size:', error);
+        console.error('[yt-dlp] Error getting file size:', error);
         return 0;
     }
 }
 
+/**
+ * حذف ملف
+ */
 function deleteFile(filePath) {
     try {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log(`[Cobalt] Deleted: ${filePath}`);
+            console.log(`[yt-dlp] Deleted: ${filePath}`);
         }
     } catch (error) {
-        console.error(`[Cobalt] Error deleting file:`, error);
+        console.error(`[yt-dlp] Error deleting file:`, error);
     }
 }
 
+/**
+ * تنظيف مجلد temp من الملفات القديمة
+ */
 function cleanupTempDir() {
     try {
         const files = fs.readdirSync(TEMP_DIR);
@@ -273,10 +249,11 @@ function cleanupTempDir() {
             }
         }
     } catch (error) {
-        console.error('[Cobalt] Cleanup error:', error);
+        console.error('[yt-dlp] Cleanup error:', error);
     }
 }
 
+// Auto-cleanup every 30 minutes
 setInterval(cleanupTempDir, 30 * 60 * 1000);
 
 module.exports = {
