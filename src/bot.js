@@ -290,147 +290,147 @@ client.on("interactionCreate", async (interaction) => {
 
       return;
     }
+  }
 
-    // === معالجة الأوامر النصية ===
-    if (!interaction.isChatInputCommand()) return;
-    if (!interaction.inGuild()) return;
+  // === معالجة الأوامر النصية ===
+  if (!interaction.isChatInputCommand()) return;
+  if (!interaction.inGuild()) return;
 
-    // السماح فقط لمدير السيرفر (Manage Guild) — كطبقة حماية إضافية
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      await interaction.reply({ content: "تحتاج صلاحية Manage Server لإدارة إعدادات البوت.", ephemeral: true });
+  // السماح فقط لمدير السيرفر (Manage Guild) — كطبقة حماية إضافية
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    await interaction.reply({ content: "تحتاج صلاحية Manage Server لإدارة إعدادات البوت.", ephemeral: true });
+    return;
+  }
+
+  const guildId = interaction.guildId;
+  const sub = interaction.options.getSubcommand();
+
+  // === معالجة أوامر /download ===
+  if (interaction.commandName === "download") {
+    const dlConfig = getDownloadConfig(guildId);
+
+    if (sub === "status") {
+      const channelsText = dlConfig.channels === 'all'
+        ? 'جميع القنوات'
+        : Array.isArray(dlConfig.channels) && dlConfig.channels.length > 0
+          ? dlConfig.channels.map(id => `<#${id}>`).join(', ')
+          : 'لا توجد قنوات محددة';
+
+      await interaction.reply({
+        ephemeral: true,
+        content:
+          `**إعدادات ميزة التحميل**\n` +
+          `- الحالة: ${dlConfig.enabled ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
+          `- القنوات: ${channelsText}\n` +
+          `- الجودة الافتراضية: ${dlConfig.defaultQuality}`,
+      });
       return;
     }
 
-    const guildId = interaction.guildId;
-    const sub = interaction.options.getSubcommand();
-
-    // === معالجة أوامر /download ===
-    if (interaction.commandName === "download") {
-      const dlConfig = getDownloadConfig(guildId);
-
-      if (sub === "status") {
-        const channelsText = dlConfig.channels === 'all'
-          ? 'جميع القنوات'
-          : Array.isArray(dlConfig.channels) && dlConfig.channels.length > 0
-            ? dlConfig.channels.map(id => `<#${id}>`).join(', ')
-            : 'لا توجد قنوات محددة';
-
-        await interaction.reply({
-          ephemeral: true,
-          content:
-            `**إعدادات ميزة التحميل**\n` +
-            `- الحالة: ${dlConfig.enabled ? '✅ مفعّلة' : '❌ معطّلة'}\n` +
-            `- القنوات: ${channelsText}\n` +
-            `- الجودة الافتراضية: ${dlConfig.defaultQuality}`,
-        });
-        return;
-      }
-
-      if (sub === "toggle") {
-        const enabled = interaction.options.getBoolean("enabled", true);
-        setDownloadConfig(guildId, { enabled });
-        await interaction.reply({
-          ephemeral: true,
-          content: enabled ? '✅ تم تفعيل ميزة التحميل' : '❌ تم تعطيل ميزة التحميل',
-        });
-        return;
-      }
-
-      if (sub === "addchannel") {
-        const channel = interaction.options.getChannel("channel", true);
-
-        let channels = dlConfig.channels === 'all' ? [] : (Array.isArray(dlConfig.channels) ? dlConfig.channels : []);
-        if (!channels.includes(channel.id)) {
-          channels.push(channel.id);
-        }
-
-        setDownloadConfig(guildId, { channels });
-        await interaction.reply({
-          ephemeral: true,
-          content: `✅ تمت إضافة القناة ${channel} لقائمة التحميل`,
-        });
-        return;
-      }
-
-      if (sub === "removechannel") {
-        const channel = interaction.options.getChannel("channel", true);
-
-        let channels = Array.isArray(dlConfig.channels) ? dlConfig.channels : [];
-        channels = channels.filter(id => id !== channel.id);
-
-        setDownloadConfig(guildId, { channels });
-        await interaction.reply({
-          ephemeral: true,
-          content: `✅ تمت إزالة القناة ${channel} من قائمة التحميل`,
-        });
-        return;
-      }
-
-      if (sub === "setchannels") {
-        const mode = interaction.options.getString("mode", true);
-        setDownloadConfig(guildId, { channels: mode === 'all' ? 'all' : [] });
-        await interaction.reply({
-          ephemeral: true,
-          content: mode === 'all'
-            ? '✅ تم تفعيل التحميل في جميع القنوات'
-            : '✅ تم تحديد نمط القنوات المحددة (استخدم /download addchannel لإضافة قنوات)',
-        });
-        return;
-      }
-
+    if (sub === "toggle") {
+      const enabled = interaction.options.getBoolean("enabled", true);
+      setDownloadConfig(guildId, { enabled });
+      await interaction.reply({
+        ephemeral: true,
+        content: enabled ? '✅ تم تفعيل ميزة التحميل' : '❌ تم تعطيل ميزة التحميل',
+      });
       return;
     }
 
-    // === معالجة أوامر /memerate ===
-    if (interaction.commandName === "memerate") {
-      const config = getGuildConfig(guildId);
+    if (sub === "addchannel") {
+      const channel = interaction.options.getChannel("channel", true);
 
-      if (sub === "status") {
-        await interaction.reply({
-          ephemeral: true,
-          content:
-            `**Memerate config**\n` +
-            `- Channels: ${config.enabledChannelIds.length ? config.enabledChannelIds.map((id) => `<#${id}>`).join(", ") : "none"}\n` +
-            `- Duration: ${config.durationMinutes} minutes\n` +
-            `- Emojis: ${config.emojis.positive} / ${config.emojis.negative}`,
-        });
-        return;
+      let channels = dlConfig.channels === 'all' ? [] : (Array.isArray(dlConfig.channels) ? dlConfig.channels : []);
+      if (!channels.includes(channel.id)) {
+        channels.push(channel.id);
       }
 
-      if (sub === "setduration") {
-        const minutes = interaction.options.getInteger("minutes", true);
-        const next = setGuildConfig(guildId, { durationMinutes: minutes });
-        await interaction.reply({ ephemeral: true, content: `تم ضبط مدة التصويت إلى **${next.durationMinutes}** دقيقة.` });
-        return;
-      }
-
-      if (sub === "setemojis") {
-        const positive = interaction.options.getString("positive", true).trim();
-        const negative = interaction.options.getString("negative", true).trim();
-        const next = setGuildConfig(guildId, { emojis: { positive, negative } });
-        await interaction.reply({ ephemeral: true, content: `تم ضبط الإيموجيات إلى: ${next.emojis.positive} / ${next.emojis.negative}` });
-        return;
-      }
-
-      if (sub === "addchannel") {
-        const channel = interaction.options.getChannel("channel", true);
-        const ids = new Set(config.enabledChannelIds);
-        ids.add(channel.id);
-        const next = setGuildConfig(guildId, { enabledChannelIds: Array.from(ids) });
-        await interaction.reply({ ephemeral: true, content: `تمت إضافة القناة ${channel} للمراقبة.` });
-        return;
-      }
-
-      if (sub === "removechannel") {
-        const channel = interaction.options.getChannel("channel", true);
-        const nextIds = config.enabledChannelIds.filter((id) => id !== channel.id);
-        setGuildConfig(guildId, { enabledChannelIds: nextIds });
-        await interaction.reply({ ephemeral: true, content: `تمت إزالة القناة ${channel} من المراقبة.` });
-        return;
-      }
-
+      setDownloadConfig(guildId, { channels });
+      await interaction.reply({
+        ephemeral: true,
+        content: `✅ تمت إضافة القناة ${channel} لقائمة التحميل`,
+      });
       return;
     }
+
+    if (sub === "removechannel") {
+      const channel = interaction.options.getChannel("channel", true);
+
+      let channels = Array.isArray(dlConfig.channels) ? dlConfig.channels : [];
+      channels = channels.filter(id => id !== channel.id);
+
+      setDownloadConfig(guildId, { channels });
+      await interaction.reply({
+        ephemeral: true,
+        content: `✅ تمت إزالة القناة ${channel} من قائمة التحميل`,
+      });
+      return;
+    }
+
+    if (sub === "setchannels") {
+      const mode = interaction.options.getString("mode", true);
+      setDownloadConfig(guildId, { channels: mode === 'all' ? 'all' : [] });
+      await interaction.reply({
+        ephemeral: true,
+        content: mode === 'all'
+          ? '✅ تم تفعيل التحميل في جميع القنوات'
+          : '✅ تم تحديد نمط القنوات المحددة (استخدم /download addchannel لإضافة قنوات)',
+      });
+      return;
+    }
+
+    return;
+  }
+
+  // === معالجة أوامر /memerate ===
+  if (interaction.commandName === "memerate") {
+    const config = getGuildConfig(guildId);
+
+    if (sub === "status") {
+      await interaction.reply({
+        ephemeral: true,
+        content:
+          `**Memerate config**\n` +
+          `- Channels: ${config.enabledChannelIds.length ? config.enabledChannelIds.map((id) => `<#${id}>`).join(", ") : "none"}\n` +
+          `- Duration: ${config.durationMinutes} minutes\n` +
+          `- Emojis: ${config.emojis.positive} / ${config.emojis.negative}`,
+      });
+      return;
+    }
+
+    if (sub === "setduration") {
+      const minutes = interaction.options.getInteger("minutes", true);
+      const next = setGuildConfig(guildId, { durationMinutes: minutes });
+      await interaction.reply({ ephemeral: true, content: `تم ضبط مدة التصويت إلى **${next.durationMinutes}** دقيقة.` });
+      return;
+    }
+
+    if (sub === "setemojis") {
+      const positive = interaction.options.getString("positive", true).trim();
+      const negative = interaction.options.getString("negative", true).trim();
+      const next = setGuildConfig(guildId, { emojis: { positive, negative } });
+      await interaction.reply({ ephemeral: true, content: `تم ضبط الإيموجيات إلى: ${next.emojis.positive} / ${next.emojis.negative}` });
+      return;
+    }
+
+    if (sub === "addchannel") {
+      const channel = interaction.options.getChannel("channel", true);
+      const ids = new Set(config.enabledChannelIds);
+      ids.add(channel.id);
+      const next = setGuildConfig(guildId, { enabledChannelIds: Array.from(ids) });
+      await interaction.reply({ ephemeral: true, content: `تمت إضافة القناة ${channel} للمراقبة.` });
+      return;
+    }
+
+    if (sub === "removechannel") {
+      const channel = interaction.options.getChannel("channel", true);
+      const nextIds = config.enabledChannelIds.filter((id) => id !== channel.id);
+      setGuildConfig(guildId, { enabledChannelIds: nextIds });
+      await interaction.reply({ ephemeral: true, content: `تمت إزالة القناة ${channel} من المراقبة.` });
+      return;
+    }
+
+    return;
   }
 });
 
