@@ -163,7 +163,7 @@ app.get("/", (req, res) => {
 
 // Catch-all route - يجب أن يكون آخر route
 // يستثني مسارات الـ API والملفات الثابتة
-app.get("*", (req, res, next) => {
+app.get("/*", (req, res, next) => {
     if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {
         return next(); // اترك الـ API routes تمر
     }
