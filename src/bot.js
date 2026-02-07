@@ -141,6 +141,12 @@ function scheduleFinalize(guildId, channelId, messageId, endsAtMs, createdAtMs) 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
+  // ضبط حالة البوت - dnd + playing
+  client.user.setPresence({
+    activities: [{ name: 'dev by : wlc8', type: 0 }],
+    status: 'dnd'
+  });
+
   // إعادة جدولة المؤقّتات بعد إعادة تشغيل البوت
   const pending = readPending();
   const now = Date.now();
